@@ -70,8 +70,7 @@ def process_csv(filepath, market_name):
         'dom_values': [],
         'cities': defaultdict(int),
         'zips': defaultdict(int),
-        # V2: Store full transaction details instead of just dates
-        'transaction_details': []  # List of {date, city, zip, price, dom, type}
+        'transaction_details': []
     })
 
     companies = defaultdict(lambda: {
@@ -83,10 +82,8 @@ def process_csv(filepath, market_name):
         'total_volume': 0
     })
 
-    # Track actual market stats (each transaction counted once)
     market_transaction_count = 0
     market_total_volume = 0
-
     rows_processed = 0
     rows_skipped_no_date = 0
 
@@ -99,17 +96,14 @@ def process_csv(filepath, market_name):
                 continue
 
             rows_processed += 1
-
             sold_price = clean_price(row.get('sold_price', '0'))
             city = row.get('city', '').strip()
             zip_code = row.get('zip', '').strip()
             dom = parse_dom(row.get('days_on_market', ''))
 
-            # Track actual market volume (each transaction counted once)
             market_transaction_count += 1
             market_total_volume += sold_price
 
-            # Process listing agent
             listing_agent = row.get('listing_agent_name', '').strip()
             listing_first = row.get('listing_agent_first_name', '').strip()
             listing_email = row.get('listing_agent_email', '').strip().lower()
@@ -132,13 +126,12 @@ def process_csv(filepath, market_name):
                     agents[key]['cities'][city] += 1
                 if zip_code:
                     agents[key]['zips'][zip_code] += 1
-                # V2: Store full transaction detail
                 agents[key]['transaction_details'].append({
                     'dt': close_date,
                     'c': city,
                     'z': zip_code,
                     'p': sold_price,
-                    'ty': 'l'  # listing
+                    'ty': 'l'
                 })
 
                 if listing_office:
@@ -148,7 +141,6 @@ def process_csv(filepath, market_name):
                     companies[listing_office.lower()]['listings'] += 1
                     companies[listing_office.lower()]['total_volume'] += sold_price
 
-            # Process selling/buying agent
             selling_agent = row.get('selling_agent_name', '').strip()
             selling_first = row.get('selling_agent_first_name', '').strip()
             selling_email = row.get('selling_agent_email', '').strip().lower()
@@ -171,13 +163,12 @@ def process_csv(filepath, market_name):
                     agents[key]['cities'][city] += 1
                 if zip_code:
                     agents[key]['zips'][zip_code] += 1
-                # V2: Store full transaction detail
                 agents[key]['transaction_details'].append({
                     'dt': close_date,
                     'c': city,
                     'z': zip_code,
                     'p': sold_price,
-                    'ty': 's'  # sale
+                    'ty': 's'
                 })
 
                 if selling_office:
@@ -190,7 +181,6 @@ def process_csv(filepath, market_name):
     print(f"  Rows processed: {rows_processed}")
     print(f"  Rows skipped (no close date): {rows_skipped_no_date}")
 
-    # Return market stats as well
     raw_market_stats = {
         'transaction_count': market_transaction_count,
         'total_volume': market_total_volume
@@ -210,8 +200,6 @@ def format_agents_for_js(agents):
         if data['dom_values']:
             avg_dom = int(sum(data['dom_values']) / len(data['dom_values']))
 
-        # V2: Sort transaction details by date, keep full structure
-        # Remove duplicates by creating unique key (date+city+zip+type)
         seen = set()
         unique_transactions = []
         for tx in sorted(data['transaction_details'], key=lambda x: x['dt']):
@@ -241,7 +229,6 @@ def format_agents_for_js(agents):
             'c': top_cities,
             'z': top_zips,
             'tok': generate_token(data['email']),
-            # V2: Full transaction details with city/zip per date
             'd': unique_transactions
         }
         result.append(agent_obj)
@@ -288,13 +275,11 @@ def calculate_market_stats(agents_js, raw_market_stats):
         'avg_vol': int(total_vol / total),
         'avg_listings': round(total_listings / total, 1),
         'avg_dom': round(avg_dom, 0),
-        # Actual market stats (each transaction counted once)
         'market_transactions': raw_market_stats['transaction_count'],
         'market_volume': raw_market_stats['total_volume']
     }
 
 def main():
-    # Ensure output directory exists
     os.makedirs('output', exist_ok=True)
 
     # Process Phoenix
@@ -315,13 +300,12 @@ def main():
         print(f"  Market transactions: {raw_market_stats['transaction_count']:,}")
         print(f"  Market volume: ${raw_market_stats['total_volume']:,}")
 
-        # Output JSON files
         with open('output/phoenix_agents.json', 'w') as f:
             json.dump({
                 'agents': agents_js,
                 'stats': market_stats,
                 'updated': datetime.now().isoformat(),
-                'version': 2  # Mark as V2 format
+                'version': 2
             }, f)
         print(f"  Wrote output/phoenix_agents.json")
 
@@ -332,6 +316,12 @@ def main():
                 'updated': datetime.now().isoformat()
             }, f)
         print(f"  Wrote output/phoenix_companies.json")
+
+        # Output standalone agents array for async-loading HTML pages
+        os.makedirs('phx-internal', exist_ok=True)
+        with open('phx-internal/agents.json', 'w') as f:
+            json.dump(agents_js, f)
+        print(f"  Wrote phx-internal/agents.json (standalone array)")
 
     # Process Tucson
     tucson_csv = 'data/tucson_closed.csv'
@@ -351,13 +341,12 @@ def main():
         print(f"  Market transactions: {raw_market_stats['transaction_count']:,}")
         print(f"  Market volume: ${raw_market_stats['total_volume']:,}")
 
-        # Output JSON files
         with open('output/tucson_agents.json', 'w') as f:
             json.dump({
                 'agents': agents_js,
                 'stats': market_stats,
                 'updated': datetime.now().isoformat(),
-                'version': 2  # Mark as V2 format
+                'version': 2
             }, f)
         print(f"  Wrote output/tucson_agents.json")
 
@@ -368,6 +357,12 @@ def main():
                 'updated': datetime.now().isoformat()
             }, f)
         print(f"  Wrote output/tucson_companies.json")
+
+        # Output standalone agents array for async-loading HTML pages
+        os.makedirs('tuc-internal', exist_ok=True)
+        with open('tuc-internal/agents.json', 'w') as f:
+            json.dump(agents_js, f)
+        print(f"  Wrote tuc-internal/agents.json (standalone array)")
 
     print("\n" + "="*60)
     print("Done! V2 JSON files written to output/")
