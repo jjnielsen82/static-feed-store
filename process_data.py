@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Process Elite Agent Data for GitHub Actions
+Process Elite Agent Data for GitHub Actions - V2
+Now includes city/zip with each transaction date for accurate time+location filtering.
+
 Reads CSV files from data/ directory, computes agent statistics,
 and outputs JSON files to output/ directory.
 
@@ -68,7 +70,8 @@ def process_csv(filepath, market_name):
         'dom_values': [],
         'cities': defaultdict(int),
         'zips': defaultdict(int),
-        'close_dates': []
+        # V2: Store full transaction details instead of just dates
+        'transaction_details': []  # List of {date, city, zip, price, dom, type}
     })
 
     companies = defaultdict(lambda: {
@@ -129,8 +132,14 @@ def process_csv(filepath, market_name):
                     agents[key]['cities'][city] += 1
                 if zip_code:
                     agents[key]['zips'][zip_code] += 1
-                if close_date:
-                    agents[key]['close_dates'].append(close_date)
+                # V2: Store full transaction detail
+                agents[key]['transaction_details'].append({
+                    'dt': close_date,
+                    'c': city,
+                    'z': zip_code,
+                    'p': sold_price,
+                    'ty': 'l'  # listing
+                })
 
                 if listing_office:
                     companies[listing_office.lower()]['name'] = listing_office
@@ -162,8 +171,14 @@ def process_csv(filepath, market_name):
                     agents[key]['cities'][city] += 1
                 if zip_code:
                     agents[key]['zips'][zip_code] += 1
-                if close_date:
-                    agents[key]['close_dates'].append(close_date)
+                # V2: Store full transaction detail
+                agents[key]['transaction_details'].append({
+                    'dt': close_date,
+                    'c': city,
+                    'z': zip_code,
+                    'p': sold_price,
+                    'ty': 's'  # sale
+                })
 
                 if selling_office:
                     companies[selling_office.lower()]['name'] = selling_office
@@ -195,7 +210,16 @@ def format_agents_for_js(agents):
         if data['dom_values']:
             avg_dom = int(sum(data['dom_values']) / len(data['dom_values']))
 
-        dates = sorted(set(data['close_dates']))
+        # V2: Sort transaction details by date, keep full structure
+        # Remove duplicates by creating unique key (date+city+zip+type)
+        seen = set()
+        unique_transactions = []
+        for tx in sorted(data['transaction_details'], key=lambda x: x['dt']):
+            key = f"{tx['dt']}|{tx['c']}|{tx['z']}|{tx['ty']}"
+            if key not in seen:
+                seen.add(key)
+                unique_transactions.append(tx)
+
         top_cities = dict(sorted(data['cities'].items(), key=lambda x: -x[1])[:10])
         top_zips = dict(sorted(data['zips'].items(), key=lambda x: -x[1])[:10])
 
@@ -217,7 +241,8 @@ def format_agents_for_js(agents):
             'c': top_cities,
             'z': top_zips,
             'tok': generate_token(data['email']),
-            'd': dates
+            # V2: Full transaction details with city/zip per date
+            'd': unique_transactions
         }
         result.append(agent_obj)
 
@@ -276,7 +301,7 @@ def main():
     phoenix_csv = 'data/phoenix_closed.csv'
     if os.path.exists(phoenix_csv):
         print("\n" + "="*60)
-        print("Processing Phoenix data...")
+        print("Processing Phoenix data (V2 - with transaction details)...")
         print("="*60)
 
         agents, companies, raw_market_stats = process_csv(phoenix_csv, 'Phoenix')
@@ -295,7 +320,8 @@ def main():
             json.dump({
                 'agents': agents_js,
                 'stats': market_stats,
-                'updated': datetime.now().isoformat()
+                'updated': datetime.now().isoformat(),
+                'version': 2  # Mark as V2 format
             }, f)
         print(f"  Wrote output/phoenix_agents.json")
 
@@ -311,7 +337,7 @@ def main():
     tucson_csv = 'data/tucson_closed.csv'
     if os.path.exists(tucson_csv):
         print("\n" + "="*60)
-        print("Processing Tucson data...")
+        print("Processing Tucson data (V2 - with transaction details)...")
         print("="*60)
 
         agents, companies, raw_market_stats = process_csv(tucson_csv, 'Tucson')
@@ -330,7 +356,8 @@ def main():
             json.dump({
                 'agents': agents_js,
                 'stats': market_stats,
-                'updated': datetime.now().isoformat()
+                'updated': datetime.now().isoformat(),
+                'version': 2  # Mark as V2 format
             }, f)
         print(f"  Wrote output/tucson_agents.json")
 
@@ -343,7 +370,7 @@ def main():
         print(f"  Wrote output/tucson_companies.json")
 
     print("\n" + "="*60)
-    print("Done! JSON files written to output/")
+    print("Done! V2 JSON files written to output/")
     print("="*60)
 
 if __name__ == '__main__':
