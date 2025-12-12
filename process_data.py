@@ -22,14 +22,18 @@ def clean_price(price_str):
     return int(re.sub(r'[^\d]', '', str(price_str)) or 0)
 
 def parse_date(date_str):
-    """Parse date string like '01/10/2025' or '12/31/2024' to YYYY-MM-DD."""
+    """Parse date string like '01/10/2025', '12/31/2024', or '12/31/24' to YYYY-MM-DD."""
     if not date_str:
         return None
-    try:
-        dt = datetime.strptime(date_str, '%m/%d/%Y')
-        return dt.strftime('%Y-%m-%d')
-    except:
-        return None
+    date_str = date_str.strip()
+    # Try multiple date formats
+    for fmt in ['%m/%d/%Y', '%m/%d/%y', '%Y-%m-%d']:
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            return dt.strftime('%Y-%m-%d')
+        except:
+            continue
+    return None
 
 def parse_dom(dom_str):
     """Parse days on market - only return valid positive integers."""
