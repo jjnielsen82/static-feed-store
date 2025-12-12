@@ -6,6 +6,10 @@ on:
       - 'data/*.csv'
   workflow_dispatch:  # Allow manual trigger
 
+concurrency:
+  group: process-data
+  cancel-in-progress: false
+
 jobs:
   process:
     runs-on: ubuntu-latest
@@ -13,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,6 +36,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git pull --rebase origin main
           git add output/*.json
           git diff --staged --quiet || git commit -m "Update processed data [skip ci]"
           git push
