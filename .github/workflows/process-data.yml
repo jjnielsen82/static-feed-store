@@ -1,0 +1,35 @@
+name: Process Elite Agent Data
+
+on:
+  push:
+    paths:
+      - 'data/*.csv'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas
+
+      - name: Process data and generate JSON
+        run: python process_data.py
+
+      - name: Commit and push generated files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add output/*.json
+          git diff --staged --quiet || git commit -m "Update processed data [skip ci]"
+          git push

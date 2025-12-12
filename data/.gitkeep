@@ -1,0 +1,2 @@
+# This directory contains raw CSV data
+# Files are synced from local scraper via sync_to_github.py
