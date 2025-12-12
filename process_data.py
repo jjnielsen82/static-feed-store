@@ -80,6 +80,10 @@ def process_csv(filepath, market_name):
         'total_volume': 0
     })
 
+    # Track actual market stats (each transaction counted once)
+    market_transaction_count = 0
+    market_total_volume = 0
+
     rows_processed = 0
     rows_skipped_no_date = 0
 
@@ -97,6 +101,10 @@ def process_csv(filepath, market_name):
             city = row.get('city', '').strip()
             zip_code = row.get('zip', '').strip()
             dom = parse_dom(row.get('days_on_market', ''))
+
+            # Track actual market volume (each transaction counted once)
+            market_transaction_count += 1
+            market_total_volume += sold_price
 
             # Process listing agent
             listing_agent = row.get('listing_agent_name', '').strip()
@@ -167,7 +175,13 @@ def process_csv(filepath, market_name):
     print(f"  Rows processed: {rows_processed}")
     print(f"  Rows skipped (no close date): {rows_skipped_no_date}")
 
-    return agents, companies
+    # Return market stats as well
+    raw_market_stats = {
+        'transaction_count': market_transaction_count,
+        'total_volume': market_total_volume
+    }
+
+    return agents, companies, raw_market_stats
 
 def format_agents_for_js(agents):
     """Format agent data for JSON output."""
@@ -230,11 +244,11 @@ def format_companies_for_js(companies):
     result.sort(key=lambda x: (-x['t'], -x['tv']))
     return result
 
-def calculate_market_stats(agents_js):
+def calculate_market_stats(agents_js, raw_market_stats):
     """Calculate market-level statistics."""
     total = len(agents_js)
     if total == 0:
-        return {'total': 0, 'avg_trans': 0, 'avg_vol': 0, 'avg_listings': 0, 'avg_dom': 0}
+        return {'total': 0, 'avg_trans': 0, 'avg_vol': 0, 'avg_listings': 0, 'avg_dom': 0, 'market_transactions': 0, 'market_volume': 0}
 
     total_trans = sum(a['t'] for a in agents_js)
     total_vol = sum(a['tv'] for a in agents_js)
@@ -248,7 +262,10 @@ def calculate_market_stats(agents_js):
         'avg_trans': round(total_trans / total, 1),
         'avg_vol': int(total_vol / total),
         'avg_listings': round(total_listings / total, 1),
-        'avg_dom': round(avg_dom, 0)
+        'avg_dom': round(avg_dom, 0),
+        # Actual market stats (each transaction counted once)
+        'market_transactions': raw_market_stats['transaction_count'],
+        'market_volume': raw_market_stats['total_volume']
     }
 
 def main():
@@ -262,14 +279,16 @@ def main():
         print("Processing Phoenix data...")
         print("="*60)
 
-        agents, companies = process_csv(phoenix_csv, 'Phoenix')
+        agents, companies, raw_market_stats = process_csv(phoenix_csv, 'Phoenix')
         agents_js = format_agents_for_js(agents)
         companies_js = format_companies_for_js(companies)
-        market_stats = calculate_market_stats(agents_js)
+        market_stats = calculate_market_stats(agents_js, raw_market_stats)
 
         print(f"\nPhoenix Results:")
         print(f"  Unique agents: {len(agents_js)}")
         print(f"  Unique companies: {len(companies_js)}")
+        print(f"  Market transactions: {raw_market_stats['transaction_count']:,}")
+        print(f"  Market volume: ${raw_market_stats['total_volume']:,}")
 
         # Output JSON files
         with open('output/phoenix_agents.json', 'w') as f:
@@ -295,14 +314,16 @@ def main():
         print("Processing Tucson data...")
         print("="*60)
 
-        agents, companies = process_csv(tucson_csv, 'Tucson')
+        agents, companies, raw_market_stats = process_csv(tucson_csv, 'Tucson')
         agents_js = format_agents_for_js(agents)
         companies_js = format_companies_for_js(companies)
-        market_stats = calculate_market_stats(agents_js)
+        market_stats = calculate_market_stats(agents_js, raw_market_stats)
 
         print(f"\nTucson Results:")
         print(f"  Unique agents: {len(agents_js)}")
         print(f"  Unique companies: {len(companies_js)}")
+        print(f"  Market transactions: {raw_market_stats['transaction_count']:,}")
+        print(f"  Market volume: ${raw_market_stats['total_volume']:,}")
 
         # Output JSON files
         with open('output/tucson_agents.json', 'w') as f:
