@@ -18,10 +18,16 @@ from datetime import datetime
 import re
 
 def clean_price(price_str):
-    """Convert price string like '$295,000' to integer."""
+    """Convert price string like '$295,000' or '$2,945,774.02' to integer."""
     if not price_str:
         return 0
-    return int(re.sub(r'[^\d]', '', str(price_str)) or 0)
+    # Remove $ and commas, keep digits and decimal point
+    cleaned = re.sub(r'[^\d.]', '', str(price_str))
+    if not cleaned:
+        return 0
+    # Convert to float first to handle cents, then to int (drops cents)
+    return int(float(cleaned))
+
 
 def parse_date(date_str):
     """Parse date string like '01/10/2025', '12/31/2024', or '12/31/24' to YYYY-MM-DD."""
@@ -370,3 +376,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
